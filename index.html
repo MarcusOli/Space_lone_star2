@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aprendendo Canvas</title>
+    <link rel="shortcut icon" href="">
+    <style>
+        canvas {
+            border: 1px solid gray;
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="jogo" width="700" height="600"></canvas>
+
+    <script >
+        class Sprite {
+            constructor(x, y, largura, altura, imagem,type='rect') {
+                this.x = x;
+                this.y = y;
+                this.largura = largura;
+                this.altura = altura;
+                this.imagem = imagem;
+                this.type = type
+            }
+
+            desenha(ctx) {
+                if (this.imagem) {
+                    ctx.drawImage(this.imagem, this.x, this.y, this.largura, this.altura);
+                } else if(this.type == 'triangle') {
+                    ctx.strokeStyle = 'darkred';
+                    ctx.fi
+                    ctx.beginPath();
+                    ctx.moveTo(this.x, this.y);
+                    ctx.lineTo(this.x- this.largura/2, this.y-this.altura);
+                    ctx.lineTo(this.x-this.largura, this.y)
+                    ctx.closePath();
+                    ctx.fillStyle = "red";
+                    ctx.fill();
+                    ctx.stroke();
+                } else {
+                    ctx.strokeRect(this.x, this.y, this.largura, this.altura);
+                }
+            }
+
+            get centro() {
+                return {
+                    x: this.x + this.largura / 2,
+                    y: this.y + this.altura / 2
+                };
+            }
+
+            colideCom(outraSprite) {
+                let a = Math.abs(outraSprite.centro.x - this.centro.x);
+                let b = Math.abs(outraSprite.centro.y - this.centro.y);
+                let d = Math.sqrt(a ** 2 + b ** 2);
+                let r1 = this.altura / 2;
+                let r2 = outraSprite.altura / 2;
+
+                // if (d <= r1 + r2) {
+                //     return true;
+                // } else {
+                //     return false;
+                // }
+
+                return d <= r1 + r2;
+            }
+        }
+        class Ovini extends Sprite{
+            constructor(){
+                super(Math.random() * (700 - 30),0,30,30,ImgOvini)
+                this.velocidadeY = 2 * Math.random() + 1
+            }
+            atualizar() {
+                this.y += this.velocidadeY;
+
+                 if (this.y + this.largura > 600) {
+                    this.x = Math.random() * (700 - 30)
+                    this.y = 0
+                }
+            }
+            destruir(){
+                this.x = Math.random() * (700 - 30)
+                this.y = 0
+            }
+        }
+        class Tiro extends Sprite{
+            constructor(estrela,type){
+                super(estrela.centro.x,estrela.centro.y,20,20,undefined,type)
+                this.velocidadeY = 5
+            }
+            atualizar(){
+                this.y -= this.velocidadeY
+                if(this.y < 0){
+                    this.saiu = true;
+                }
+            }
+        }
+        let canvasEl = document.querySelector('#jogo');
+        let ctx = canvasEl.getContext('2d');
+        ctx.imageSmoothingEnabled = false;
+
+        let background = new Image();
+        background.src = 'imgs/back.jpg'
+
+        background.onload = function(){
+            desenhaJogo();   
+        }
+        let ImgOvini = new Image()
+        ImgOvini.src = 'imgs/ovini.png'
+        let imagemEstrela = new Image();
+        imagemEstrela.src = 'imgs/estrela.png';
+        let slime = new Sprite(350, 550, 50, 50, imagemEstrela);
+        let ovinis = []
+        ovinis.push(new Ovini())
+        ovinis.push(new Ovini())
+        ovinis.push(new Ovini())
+        let tiros = []
+        
+
+        
+
+        // assim que a imagem estiver pronta, manda desenhar o jogo
+        imagemEstrela.addEventListener('load', (evento) => {
+            desenhaJogo();
+        });
+        
+        // qdo mouse movimenta, define posição do slime e redesenha
+        canvasEl.addEventListener('mousemove', (evento) => {
+            slime.x = evento.offsetX - slime.largura/2;
+            slime.y = evento.offsetY - slime.altura/2;
+            desenhaJogo();
+        });
+        
+        // 1. apaga tudo, 2. desenha slime e 3. meteoros
+        function desenhaJogo() {
+            ctx.clearRect(0, 0, 700, 600);
+
+            ctx.drawImage(background,0,0)
+            slime.desenha(ctx);
+
+            // a. for tradicional
+            // for (let i = 0; i < meteoros.length; i++) {
+            //     meteoros[i].desenha(ctx);
+            // }
+
+            // b. for of
+            for (let ovini of ovinis) {
+                ovini.desenha(ctx);
+            }
+            for (let tiro of tiros) {
+                tiro.desenha(ctx);
+            }
+            
+            // c. forEach
+            // meteoros.forEach(meteoro => meteoro.desenha(ctx));
+        }
+
+        function atualizaInimigos() {
+            // atualiza posição dos meteoros
+            for (let ovini of ovinis) {
+                ovini.atualizar();
+            }
+        }
+
+        function atualizaTiros() {
+            // atualiza posição dos tiros
+            for (let tiro of tiros) {
+                tiro.atualizar();
+            }
+
+            // verifica se algum tiro saiu da tela
+            for (let i = 0; i < tiros.length; i++) {
+                if (tiros[i].saiu) {
+                    // remove o tiro atual do vetor de tiros
+                    tiros.splice(i, 1);
+                }
+            }
+        }
+
+        function verificaColisoes() {
+            // verificar se algum meteoro atingiu jogador
+            for (let ovini of ovinis) {
+                const atingiuSlime = ovini.colideCom(slime);
+                if (atingiuSlime) {
+                    ovini.destruir();
+                    vidas--;
+                    if (vidas < 1) {
+                        alert('Jogador morreu!')
+                    }
+                }
+            }
+
+            // verificar colisão tiros e meteoros
+            for (let ovini of ovinis) {
+                for (let tiro of tiros) {
+                    const AtingiuMeteoro = tiro.colideCom(ovini);
+                    if (AtingiuMeteoro) {
+                        tiro.sai = true;
+                        ovini.destruir();
+                    }
+                }
+            }
+        }
+
+        function atualizaLogicaJogo() {
+            atualizaInimigos();
+            atualizaTiros();
+            verificaColisoes();
+
+            // redesenho o jogo
+            desenhaJogo();
+        }
+
+        setInterval(atualizaLogicaJogo, 33);
+
+        function darTiro() {
+            let tiro = new Tiro(slime,"triangle");
+            tiros.push(tiro);
+        }
+
+        document.body.addEventListener('keydown', e => {
+            if (e.key === ' ') {
+                darTiro();
+                
+                // previne que o navegador role a página (pq apertou <espaço>)
+                e.preventDefault();
+            }
+        });
+
+    </script>
+
+</body>
+</html>
